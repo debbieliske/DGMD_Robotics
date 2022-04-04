@@ -8,6 +8,8 @@ from std_msgs.msg import UInt16, String # Unsigned integer message type
 import cv2 # OpenCV library
 from cv_bridge import CvBridge # Converts between OpenCV and ROS images
 import time
+from PIL import Image
+import numpy as np
 
 # Global constants and variables
 NUM_FILT_POINTS      = 5 # Number of filtering points for the Moving Average Filter
@@ -32,14 +34,31 @@ def listener():
     rospy.Subscriber('/camera_info', CameraInfo, CameraInfoCallback, queue_size=10)
 
     # Put this node in an inifinite loop to execute when new messages arrive
-    rospy.spin()
-
+    #rospy.spin()
+    
 # '/image_raw' topic message handler
-def RawImageCallback(message):
+def callbackImage(message):
     global image_raw
 
     image_raw = message.data
+    print(image_raw)
 
+# '/image_raw' topic message handler
+def callbackImageComp(message):
+    global image_comp
+    global np_img
+
+    #image_comp = message.data
+    
+    #image_comp = cv2.imread(img)
+    #print(image_comp)
+    np_arr = np.fromstring(message.data, np.uint8)
+    #print(np_arr)
+    np_img = np_arr
+    image_comp = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+    image_comp = np_arr
+    #print(image_comp)
+    
 # '/camera_info' topic message handler
 def CameraInfoCallback(message):
     global camera_info
@@ -52,17 +71,20 @@ def CameraInfoCallback(message):
   
 def detect_target():
   """ Main entry function for this node. """
- 
+  global image_raw
+  global image_comp
+  global np_img
+  
   # Publishes the video frames from the detection process
   # detect_image_pub = rospy.Publisher('detect_image', Image, queue_size=10)
   detect_image_pub = rospy.Publisher('detect_image/compressed', CompressedImage, queue_size=10)
 
   # Publishes the (x, y, 0) coordinates for the detected target
   target_coord_pub = rospy.Publisher('/target_coord', Point, queue_size=10)
-
+  #print(target_coord_pub)
   # Publishes the detected target's computed enclosing radius
   target_radius_pub = rospy.Publisher('/target_radius', UInt16, queue_size=10)
-
+  #print(target_radius_pub)
   # Publishes the image frame width after scaling used in the detection process
   image_width_pub = rospy.Publisher('/image_width', UInt16, queue_size=10)
      
@@ -70,8 +92,17 @@ def detect_target():
   rospy.init_node('detection_node', anonymous=True)
      
   # The node will run 30 times per second
-  rate = rospy.Rate(30) # 30 Hz
-     
+  rate = rospy.Rate(0.2) # 30 Hz
+  
+  # Subscribe to the '/command' topic
+  rospy.Subscriber('/image_raw', UInt16, callbackImage)
+
+  image_comp = rospy.Subscriber('/image_raw/compressed', CompressedImage, callbackImageComp)
+  #print(image_comp.data)
+  
+  # Subscribe to the '/camera_info' topic
+  rospy.Subscriber('camera_info', CameraInfo, CameraInfoCallback, queue_size=10)   
+  
   # Create a VideoCapture object
   #vid_cam = cv2.VideoCapture(0) # '0''is de index for the default webcam
 
@@ -83,7 +114,7 @@ def detect_target():
   #print('-- Camera opened successfully')
 
   # define image
-  image = image_raw
+  #image = image_raw
 
   # Compute general parameters
   #get_image_params(vid_cam) 
@@ -95,9 +126,24 @@ def detect_target():
   # While ROS is still running.
   while not rospy.is_shutdown():
       start_time = time.time()
+ 
+      # Set the node's name
+      rospy.init_node('detection_node', anonymous=True)
+      
+      # Subscribe to the '/command' topic
+      rospy.Subscriber('/image_raw/compressed', CompressedImage, callbackImageComp)
+      
+      pix = np.array(image_comp)
+      print(pix)
+      #img = cv2.resize(image_comp, (240,240))
+      img = image_comp
+      print("img: ", img)
 
+      # Compute general parameters
+      get_image_params(img)
+      
       # Get the target coordinates
-      tgt_cam_coord, frame, contour, radius = get_target_coordinates(image)
+      tgt_cam_coord, frame, contour, radius = get_target_coordinates(img)
       
       # If a target was found, filter their coordinates
       if tgt_cam_coord['width'] is not None and tgt_cam_coord['height'] is not None:
@@ -126,10 +172,10 @@ def detect_target():
       # Publish the detected target's coordinates (x, y, 0)
       tgt_coord_msg = Point(tgt_cart_coord['x'], tgt_cart_coord['y'], 0)
       target_coord_pub.publish(tgt_coord_msg)
-
+      print(tgt_coord_msg)
       # Publish de detected target's enclosing radius
       target_radius_pub.publish(radius)
-
+      print(radius)
       # Publish the image frame's resized width
       image_width_pub.publish(params['resized_width'])
 
@@ -150,13 +196,17 @@ def detect_target():
       # Sleep just enough to maintain the desired rate
       rate.sleep()
          
-def get_image_params(vid_cam):
+def get_image_params(image):
   """ Computes useful general parameters derived from the camera image size."""
 
   # Grab a frame and get its size
-  is_grabbed, frame = vid_cam.read()
-  params['image_height'], params['image_width'], _ = frame.shape
-
+  #is_grabbed, frame = vid_cam.read()
+  frame=image
+  try:
+    params['image_height'], params['image_width'], _ = image.shape
+  except:
+    params['image_height'] = 240
+    params['image_width'] = 240
   # Compute the scaling factor to scale the image to a desired size
   if params['image_height'] != DESIRED_IMAGE_HEIGHT:
       # Rounded scaling factor. Convert 'DESIRED_IMAGE_HEIGHT' to float or the division will throw zero
@@ -171,7 +221,7 @@ def get_image_params(vid_cam):
   params['resized_height'] = int(params['image_height'] * params['scaling_factor'])
   dimension = (params['resized_width'], params['resized_height'])
   # dimension = (int(params['resized_width']), int(params['resized_height']))
-  frame = cv2.resize(frame, dimension, interpolation = cv2.INTER_AREA)
+  #frame = cv2.resize(frame, dimension, interpolation = cv2.INTER_AREA)
 
   # Compute the position for the X and Y Cartesian coordinates in camera pixel units
   params['x_ax_pos'] = int(params['resized_height']/2 - 1)
@@ -311,10 +361,10 @@ def draw_objects(cam_coord, filt_cam_coord, frame, contour):
 
 
 if __name__ == '__main__':
-  try:
-    print("Start Listening to receive Gazebo Data")
-    listener()
-    print("Prepare for Autonomous Target Detection")
-    detect_target()
-  except rospy.ROSInterruptException:
-    pass
+ # try:
+  print("Start Listening to receive Gazebo Data")
+  #listener()
+  print("Prepare for Autonomous Target Detection")
+  detect_target()
+  #except rospy.ROSInterruptException:
+  #  pass
