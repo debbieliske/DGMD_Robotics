@@ -61,7 +61,7 @@ Next:
 
 ## <div align="center">Run Detect and Test</div>
 
-![ScreenShot]("Car_Detect.png")
+![ScreenShot](Car_Detect.png)
 
 Make sure Pexels video (Pexels Videos 1572547_540p.mp4) is stored in the same directory as python script and run:
 
