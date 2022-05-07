@@ -61,7 +61,7 @@ Next:
 
 ## <div align="center">Run Detect and Test</div>
 
-<img src="https://github.com/debbieliske/DGMD_Robotics/tree/main/HW_A4/Car_Detect.png">
+![ScreenShot]("Car_Detect.png")
 
 Make sure Pexels video (Pexels Videos 1572547_540p.mp4) is stored in the same directory as python script and run:
 
