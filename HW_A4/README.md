@@ -1,5 +1,5 @@
 # DGMD_Robotics
-
+## Homework A4 Instructions
 <br>
 <div>
    <a href="https://github.com/ultralytics/yolov5/actions"><img src="https://github.com/ultralytics/yolov5/workflows/CI%20CPU%20testing/badge.svg" alt="Stable Build"></a>
@@ -59,10 +59,14 @@ Next:
 	  ./QGroundControl.AppImage  # (or double click)
 ```
 
+## <div align="center">Run Detect and Test</div>
+
+<img src="https://github.com/debbieliske/DGMD_Robotics/tree/main/HW_A4/Car_Detect.png">
+
+Make sure Pexels video (Pexels Videos 1572547_540p.mp4) is stored in the same directory as python script and run:
+
+```bash
+	python3 detect_test.py
+```
+
 ## <div align="center">Run Track and Follow</div>
-
-
-
-
-
-## <div align="center">Install Dependencies</div>
